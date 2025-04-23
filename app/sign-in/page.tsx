@@ -22,7 +22,7 @@ export default function SignInPage() {
   const router = useRouter()
 
   // Admin password - in a real app, this would be handled securely on the server
-  const ADMIN_PASSWORD = "admin123"
+  const ADMIN_PASSWORD = "googleit0!"
 
   const validateStudentForm = () => {
     let valid = true
