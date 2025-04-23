@@ -135,9 +135,6 @@ export default function SignInPage() {
                   </div>
                   {errors.adminPassword && <p className="text-sm text-red-500">{errors.adminPassword}</p>}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  <p>For demo purposes, use password: admin123</p>
-                </div>
                 <Button type="submit" className="w-full">
                   Sign In as Admin
                 </Button>
