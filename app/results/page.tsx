@@ -9,12 +9,15 @@ import { format } from "date-fns"
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
 import { quizData } from "@/lib/quiz-data"
+import { saveQuizResult } from "@/lib/firebase/firebase"
+import { QuizResult } from "@/lib/types"
 
 export default function ResultsPage() {
-  const { isAuthenticated, quizResults } = useUser()
+  const { isAuthenticated, quizResults, user } = useUser()
   const router = useRouter()
 
   useEffect(() => {
+
     if (!isAuthenticated) {
       router.push("/sign-in")
     }
@@ -31,6 +34,27 @@ export default function ResultsPage() {
   const getTopicTitle = (topicId: string) => {
     const topic = quizData.find((t) => t.id === topicId)
     return topic ? topic.title : topicId
+  }
+
+  useEffect(() => {
+    if (sortedResults.length > 0 && user) {
+      sortedResults.forEach((result) => {
+        const quizResult: QuizResult = {
+          userId: user.id,
+          topic: result.topicId,
+          score: result.score,
+          date: result.date,
+          quizData: result.answers,
+          timeTaken: result.timeTaken
+        }
+        saveQuizResult(quizResult).catch((error) => {
+          console.error("Error saving quiz result:", error)
+        })
+      })
+    }
+  }, [sortedResults, user])
+
+  if (!user) {
   }
 
   return (
@@ -83,11 +107,11 @@ export default function ResultsPage() {
                             : result.completed
                               ? "Quiz completed successfully"
                               : "Quiz not completed"}
-                        </p>
-                      </div>
-                    </div>
-                    <Link href={`/quiz/${result.topicId}`}>
-                      <Button variant="outline" size="sm">
+                </p>
+              </div>
+            </div>
+            <Link href={`/quiz/${result.topicId}`}>
+              <Button variant="outline" size="sm">
                         Retry Quiz
                       </Button>
                     </Link>

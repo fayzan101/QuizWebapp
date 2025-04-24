@@ -16,6 +16,11 @@ Admin Dashboard:
   - Tab switching during a quiz leads to automatic disqualification.
   - The system gives a score of 0 if a user switches tabs during an active quiz.
 
+## Firebase Integration
+
+This project uses Firebase as its database solution. Firebase will be used to store quiz data and sync quiz results between different devices. This allows users to start a quiz on one device and continue it on another seamlessly, while also providing real-time updates to quiz results.
+
+
 ## Technologies Used
 Frontend: TypeScript, HTML, CSS
 Backend: Node.js / Express (or your backend stack)
