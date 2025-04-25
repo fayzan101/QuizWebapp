@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm build",
-  "installCommand": "pnpm install",
-  "pnpmVersion": "9.x"
+  "engines": {
+    "pnpm": "9.x"
+  }
 }
