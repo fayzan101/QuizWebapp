@@ -1,5 +1,5 @@
 import { initializeApp, getApps, FirebaseApp, FirebaseOptions } from "firebase/app";
-import { getFirestore, Firestore, collection, addDoc, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { getFirestore, Firestore, collection, addDoc, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot, getDocs } from "firebase/firestore";
 
 import { QuizResult } from "../types";
 
@@ -26,17 +26,23 @@ function listenForQuizResultChanges() {
   return unsub;
 }
 
-async function saveQuizResult(result: QuizResult) {
+async function saveQuizResult(result: QuizResult): Promise<void> {
+  const { userId, topic, quizData, ...resultWithoutTopicAndQuizData } = result;
+
   try {
-    const userDocRef = doc(db, 'quizResults', result.userId);
+    const userDocRef = doc(db, 'quizResults', userId);
     const userDocSnap = await getDoc(userDocRef);
 
     if (!userDocSnap.exists()) {
       await setDoc(userDocRef, {
-        results: [result],
+        results: [{
+          ...resultWithoutTopicAndQuizData,
+          topic, quizData
+        }],
       });
       listenForQuizResultChanges();
     } else {
+      
       await updateDoc(userDocRef, {
         results: arrayUnion(result),
       });
@@ -46,4 +52,21 @@ async function saveQuizResult(result: QuizResult) {
     console.error("Error saving quiz result:", error);
   }
 }
-export { app, db, firebaseConfig, saveQuizResult };
+
+async function getAllQuizResults(): Promise<QuizResult[]> {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'quizResults'));
+    const results: QuizResult[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.results && Array.isArray(data.results)) {
+        results.push(...data.results);
+      }
+    });
+    return results;
+  } catch (error) {
+    console.error("Error getting all quiz results:", error);
+    return [];
+  }
+}
+export { app, db, firebaseConfig, saveQuizResult, getAllQuizResults };

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useUser } from "@/contexts/user-context"
@@ -14,9 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 
-export default function AdminDashboardPage() {
+import { getAllQuizResults } from "@/lib/firebase/firebase";
+export default async function AdminDashboardPage() {
   const { isAuthenticated, isAdmin, getAllResults } = useUser()
-  const router = useRouter()
+    const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [topicFilter, setTopicFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -29,7 +30,10 @@ export default function AdminDashboardPage() {
     }
   }, [isAuthenticated, isAdmin, router])
 
-  if (!isAuthenticated || !isAdmin) {
+    const quizResults = await getAllQuizResults()
+    console.log(quizResults)
+
+    if (!isAuthenticated || !isAdmin) {
     return null
   }
 
@@ -105,6 +109,8 @@ export default function AdminDashboardPage() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-7xl mx-auto">
+        Quiz Results:
+        <div>{JSON.stringify(quizResults)}</div>
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
           <Link href="/admin/questions">
