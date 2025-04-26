@@ -1,7 +1,5 @@
-Here's an updated version of your README to reflect the addition of Firebase as the backend:
 
-```markdown
-# Quiz Web App
+## Quiz Web App
 
 A full-featured quiz web application built using TypeScript. This app allows users to take quizzes across various courses, securely stores quiz results, and provides an admin dashboard for managing and reviewing quiz records. Anti-cheating measures are in place to ensure quiz integrity.
 
