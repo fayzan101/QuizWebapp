@@ -4,11 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "preinstall": "rm -f pnpm-lock.yaml",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "postinstall": "pnpm install --no-frozen-lockfile"
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
