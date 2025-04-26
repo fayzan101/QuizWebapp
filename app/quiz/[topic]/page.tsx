@@ -15,76 +15,46 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 export default function QuizPage() {
   const params = useParams()
   const router = useRouter()
-  const topicId = params.topic as string
+  const topicId = typeof params.topic === "string" ? params.topic : ""
   const { isAuthenticated, addQuizResult, user, isAdmin } = useUser()
+
+  const currentTopic = quizData.find((topic) => topic.id === topicId)
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [answers, setAnswers] = useState<(number | null)[]>([])
   const [showResults, setShowResults] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(300) // 5 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(300)
   const [timerActive, setTimerActive] = useState(true)
   const [disqualified, setDisqualified] = useState(false)
   const [disqualificationReason, setDisqualificationReason] = useState("")
 
-  // Find the current topic
-  const currentTopic = quizData.find((topic) => topic.id === topicId)
-
-  // Redirect to sign-in if not authenticated
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/sign-in")
-    }
+    if (!isAuthenticated) router.push("/sign-in")
   }, [isAuthenticated, router])
 
-  // If topic not found, redirect to home
   useEffect(() => {
-    if (!currentTopic) {
-      router.push("/")
-    }
+    if (!currentTopic) router.push("/")
   }, [currentTopic, router])
 
-  // Tab change detection - skip for admin users
   useEffect(() => {
-    if (isAdmin) return // Skip tab detection for admin users
+    if (currentTopic) {
+      setAnswers(Array(currentTopic.questions.length).fill(null))
+    }
+  }, [currentTopic])
+
+  useEffect(() => {
+    if (isAdmin) return
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden" && !showResults && !disqualified) {
-        setDisqualified(true)
-        setTimerActive(false)
-        setDisqualificationReason("You switched tabs or windows during the quiz.")
-
-        // Save the disqualified result
-        if (currentTopic) {
-          addQuizResult({
-            topicId: currentTopic.id,
-            score: 0,
-            totalQuestions: currentTopic.questions.length,
-            date: new Date().toISOString(),
-            completed: false,
-            disqualified: true,
-          })
-        }
+        disqualify("You switched tabs or windows during the quiz.")
       }
     }
 
     const handleBlur = () => {
       if (!showResults && !disqualified) {
-        setDisqualified(true)
-        setTimerActive(false)
-        setDisqualificationReason("You switched to another application during the quiz.")
-
-        // Save the disqualified result
-        if (currentTopic) {
-          addQuizResult({
-            topicId: currentTopic.id,
-            score: 0,
-            totalQuestions: currentTopic.questions.length,
-            date: new Date().toISOString(),
-            completed: false,
-            disqualified: true,
-          })
-        }
+        disqualify("You switched to another application during the quiz.")
       }
     }
 
@@ -95,9 +65,27 @@ export default function QuizPage() {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("blur", handleBlur)
     }
-  }, [addQuizResult, currentTopic, disqualified, showResults, isAdmin])
+  }, [disqualified, showResults, isAdmin])
 
-  // Timer effect
+  const disqualify = (reason: string) => {
+    setDisqualified(true)
+    setTimerActive(false)
+    setDisqualificationReason(reason)
+    if (currentTopic) {
+      addQuizResult({
+        userId: user!.name,
+        topicId: currentTopic.id,
+        score: 0,
+        totalQuestions: currentTopic.questions.length,
+        date: new Date().toISOString(),
+        completed: false,
+        disqualified: true,
+        id: "",
+        userName: ""
+      })
+    }
+  }
+
   useEffect(() => {
     if (!timerActive || timeLeft <= 0) return
 
@@ -107,20 +95,20 @@ export default function QuizPage() {
           clearInterval(timer)
           setTimerActive(false)
           setShowResults(true)
-
-          // Save the result when time runs out
           if (currentTopic) {
             const score = calculateScore()
             addQuizResult({
+              userId: user!.name,
               topicId: currentTopic.id,
               score,
               totalQuestions: currentTopic.questions.length,
               date: new Date().toISOString(),
               completed: true,
               disqualified: false,
+              id: "",
+              userName: ""
             })
           }
-
           return 0
         }
         return prev - 1
@@ -128,48 +116,11 @@ export default function QuizPage() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [timerActive, timeLeft, addQuizResult, currentTopic])
-
-  if (!currentTopic || !isAuthenticated) return null
-
-  const currentQuestion = currentTopic.questions[currentQuestionIndex]
-  const totalQuestions = currentTopic.questions.length
-  const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100
-
-  const handleOptionSelect = (optionIndex: number) => {
-    setSelectedOption(optionIndex)
-  }
-
-  const handleNextQuestion = () => {
-    // Save the answer
-    const newAnswers = [...answers]
-    newAnswers[currentQuestionIndex] = selectedOption
-    setAnswers(newAnswers)
-
-    // Move to next question or show results
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
-      setSelectedOption(null)
-    } else {
-      setTimerActive(false)
-      setShowResults(true)
-
-      // Save the completed quiz result
-      const score = calculateScore(newAnswers)
-      addQuizResult({
-        topicId: currentTopic.id,
-        score,
-        totalQuestions,
-        date: new Date().toISOString(),
-        completed: true,
-        disqualified: false,
-      })
-    }
-  }
+  }, [timerActive, timeLeft, currentTopic])
 
   const calculateScore = (answersToCheck = answers) => {
     let score = 0
-    currentTopic.questions.forEach((question, index) => {
+    currentTopic?.questions.forEach((question, index) => {
       if (answersToCheck[index] === question.correctAnswer) {
         score++
       }
@@ -177,11 +128,48 @@ export default function QuizPage() {
     return score
   }
 
+  const handleOptionSelect = (optionIndex: number) => {
+    setSelectedOption(optionIndex)
+  }
+
+  const handleNextQuestion = () => {
+    const updatedAnswers = [...answers]
+    updatedAnswers[currentQuestionIndex] = selectedOption
+    setAnswers(updatedAnswers)
+
+    if (currentQuestionIndex < currentTopic!.questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
+      setSelectedOption(null)
+    } else {
+      setTimerActive(false)
+      setShowResults(true)
+
+      const score = calculateScore(updatedAnswers)
+      addQuizResult({
+        userId: user!.name,
+        topicId: currentTopic!.id,
+        score,
+        totalQuestions: currentTopic!.questions.length,
+        date: new Date().toISOString(),
+        completed: true,
+        disqualified: false,
+        id: "",
+        userName: ""
+      })
+    }
+  }
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`
   }
+
+  if (!currentTopic || !isAuthenticated) return null
+
+  const currentQuestion = currentTopic.questions[currentQuestionIndex]
+  const totalQuestions = currentTopic.questions.length
+  const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100
 
   if (disqualified) {
     return (
@@ -201,7 +189,6 @@ export default function QuizPage() {
                 {disqualificationReason} For academic integrity, you have been disqualified and received 0 marks.
               </AlertDescription>
             </Alert>
-
             <div className="text-center">
               <div className="text-5xl font-bold mb-2">0/{totalQuestions}</div>
               <p className="text-xl text-muted-foreground">Your Score: 0%</p>
@@ -254,28 +241,30 @@ export default function QuizPage() {
                           {index + 1}. {question.question}
                         </p>
                         <div className="grid grid-cols-1 gap-2">
-                          {question.options.map((option, optionIndex) => (
-                            <div
-                              key={optionIndex}
-                              className={`p-2 rounded-md ${
-                                optionIndex === question.correctAnswer
-                                  ? "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800"
-                                  : answers[index] === optionIndex
+                          {question.options.map((option, optionIndex) => {
+                            const isUserAnswer = optionIndex === answers[index]
+                            const isCorrectAnswer = optionIndex === question.correctAnswer
+                            return (
+                              <div
+                                key={optionIndex}
+                                className={`p-2 rounded-md ${
+                                  isCorrectAnswer
+                                    ? "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800"
+                                    : isUserAnswer
                                     ? "bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800"
                                     : "bg-gray-100 dark:bg-gray-800"
-                              } ${
-                                optionIndex === answers[index] || optionIndex === question.correctAnswer ? "border" : ""
-                              }`}
-                            >
-                              {option}
-                              {optionIndex === question.correctAnswer && (
-                                <span className="ml-2 text-green-600 dark:text-green-400 text-sm">(Correct)</span>
-                              )}
-                              {optionIndex === answers[index] && optionIndex !== question.correctAnswer && (
-                                <span className="ml-2 text-red-600 dark:text-red-400 text-sm">(Your Answer)</span>
-                              )}
-                            </div>
-                          ))}
+                                } ${isUserAnswer || isCorrectAnswer ? "border" : ""}`}
+                              >
+                                {option}
+                                {isCorrectAnswer && (
+                                  <span className="ml-2 text-green-600 dark:text-green-400 text-sm">(Correct)</span>
+                                )}
+                                {isUserAnswer && !isCorrectAnswer && (
+                                  <span className="ml-2 text-red-600 dark:text-red-400 text-sm">(Your Answer)</span>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     </div>
@@ -288,7 +277,7 @@ export default function QuizPage() {
             <Button variant="outline" onClick={() => router.push("/")}>
               Back to Home
             </Button>
-            <Button onClick={() => router.push(`/quiz/${topicId}`)}>Retry Quiz</Button>
+            <Button onClick={() => router.replace(`/quiz/${topicId}`)}>Retry</Button>
           </CardFooter>
         </Card>
       </div>
@@ -299,56 +288,32 @@ export default function QuizPage() {
     <div className="container mx-auto px-4 py-12">
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>{currentTopic.title}</CardTitle>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span className={`${timeLeft < 60 ? "text-red-500" : ""}`}>{formatTime(timeLeft)}</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>
-                Question {currentQuestionIndex + 1} of {totalQuestions}
-              </span>
-              <span>{Math.round(progress)}% Complete</span>
-            </div>
-            <Progress value={progress} className="h-2" />
-          </div>
+          <CardTitle className="text-2xl flex items-center justify-between">
+            {currentTopic.title}
+            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" /> {formatTime(timeLeft)}
+            </span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {!isAdmin && (
-            <Alert className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Warning</AlertTitle>
-              <AlertDescription>
-                Switching tabs or windows during the quiz will result in immediate disqualification and a score of 0.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="text-lg font-medium">{currentQuestion.question}</div>
-
-          <RadioGroup value={selectedOption?.toString()} className="space-y-3">
-            {currentQuestion.options.map((option, index) => (
-              <div
-                key={index}
-                className={`flex items-center space-x-2 p-3 rounded-md border ${
-                  selectedOption === index ? "bg-primary/10 border-primary" : "bg-muted"
-                }`}
-                onClick={() => handleOptionSelect(index)}
-              >
-                <RadioGroupItem value={index.toString()} id={`option-${index}`} checked={selectedOption === index} />
-                <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
-                  {option}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
+          <Progress value={progress} className="h-2" />
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">
+              Q{currentQuestionIndex + 1}: {currentQuestion.question}
+            </h2>
+            <RadioGroup value={selectedOption?.toString() ?? ""} onValueChange={(val) => handleOptionSelect(Number(val))}>
+              {currentQuestion.options.map((option, index) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <RadioGroupItem value={index.toString()} id={`option-${index}`} />
+                  <Label htmlFor={`option-${index}`}>{option}</Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
         </CardContent>
-        <CardFooter>
-          <Button onClick={handleNextQuestion} disabled={selectedOption === null} className="w-full">
-            {currentQuestionIndex === totalQuestions - 1 ? "Finish Quiz" : "Next Question"}
+        <CardFooter className="flex justify-end">
+          <Button disabled={selectedOption === null} onClick={handleNextQuestion}>
+            {currentQuestionIndex === totalQuestions - 1 ? "Finish" : "Next"}
           </Button>
         </CardFooter>
       </Card>

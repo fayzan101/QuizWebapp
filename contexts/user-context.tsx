@@ -1,6 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { onSnapshot, collection, query } from "firebase/firestore"
+import { db } from "@/lib/firebase/firebase"
 
 type UserRole = "student" | "admin"
 
@@ -10,6 +12,7 @@ type User = {
 } | null
 
 type QuizResult = {
+  id: string
   userId: string
   userName: string
   topicId: string
@@ -27,7 +30,7 @@ interface UserContextType {
   isAuthenticated: boolean
   isAdmin: boolean
   quizResults: QuizResult[]
-  addQuizResult: (result: Omit<QuizResult, "userId" | "userName">) => void
+  addQuizResult: (result: QuizResult) => void
   getAllResults: () => QuizResult[]
 }
 
@@ -38,58 +41,36 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [quizResults, setQuizResults] = useState<QuizResult[]>([])
   const [allResults, setAllResults] = useState<QuizResult[]>([])
 
-  // Load user data from localStorage on initial render
+  // Load user data on initial render
   useEffect(() => {
-    const storedUser = localStorage.getItem("quizUser")
-    const storedResults = localStorage.getItem("quizResults")
-    const storedAllResults = localStorage.getItem("allQuizResults")
+    const q = query(collection(db, "quizResults"))
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const results: QuizResult[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        const id = doc.id
+        ;(data.results as QuizResult[]).forEach((result: QuizResult) => {
+          results.push({ ...result, id })
+        })
+      })
+      setAllResults(results)
+      if (user) {
+        const userResults = results.filter((result) => result.userName === user.name)
+        setQuizResults(userResults)
+      } else {
+        setQuizResults([])
+      }
+    })
 
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-
-    if (storedResults) {
-      setQuizResults(JSON.parse(storedResults))
-    }
-
-    if (storedAllResults) {
-      setAllResults(JSON.parse(storedAllResults))
-    }
-  }, [])
-
-  // Save user data to localStorage whenever it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem("quizUser", JSON.stringify(user))
-    } else {
-      localStorage.removeItem("quizUser")
-    }
+    return () => unsubscribe()
   }, [user])
-
-  // Save quiz results to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem("quizResults", JSON.stringify(quizResults))
-  }, [quizResults])
-
-  // Save all results to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem("allQuizResults", JSON.stringify(allResults))
-  }, [allResults])
 
   const signIn = (name: string, isAdmin: boolean) => {
     const role = isAdmin ? "admin" : "student"
     setUser({ name, role })
 
-    // If signing in as admin, load all results
-    if (isAdmin) {
-      // For admin, we load their personal results (if any) plus all results
-      const personalResults = quizResults.filter((result) => result.userName === name)
-      setQuizResults(personalResults)
-    } else {
-      // For students, filter to only show their results
-      const userResults = allResults.filter((result) => result.userName === name)
-      setQuizResults(userResults)
-    }
+    const userResults = allResults.filter((result) => result.userName === name)
+    setQuizResults(userResults)
   }
 
   const signOut = () => {
@@ -97,19 +78,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setQuizResults([])
   }
 
-  const addQuizResult = (result: Omit<QuizResult, "userId" | "userName">) => {
+  const addQuizResult = (result: QuizResult) => {
     if (!user) return
 
     const fullResult: QuizResult = {
       ...result,
-      userId: user.name, // Using name as ID for simplicity
+      userId: user.name,
       userName: user.name,
     }
 
-    // Add to user's personal results
     setQuizResults((prev) => [...prev, fullResult])
-
-    // Add to all results for admin view
     setAllResults((prev) => [...prev, fullResult])
   }
 
