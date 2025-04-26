@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, type ReactNode, Dispatch, SetStateAction } from "react"
 import { onSnapshot, collection, query } from "firebase/firestore"
 import { db } from "@/lib/firebase/firebase"
 
@@ -50,20 +50,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const data = doc.data()
         const id = doc.id
         ;(data.results as QuizResult[]).forEach((result: QuizResult) => {
-          results.push({ ...result, id })
+          results.push({ ...result, id, userId: doc.id })
         })
       })
       setAllResults(results)
-      if (user) {
-        const userResults = results.filter((result) => result.userName === user.name)
-        setQuizResults(userResults)
-      } else {
-        setQuizResults([])
-      }
     })
 
     return () => unsubscribe()
   }, [user])
+
+  const getUserResults = async (name: string, setQuizResults: Dispatch<SetStateAction<QuizResult[]>>) => {
+    const userResults = allResults.filter((result) => result.userName === name)
+    setQuizResults(userResults)
+  }
+
+  useEffect(() => {
+    if (user) {
+      getUserResults(user.name, setQuizResults)
+    }
+  }, [user, allResults])
 
   const signIn = (name: string, isAdmin: boolean) => {
     const role = isAdmin ? "admin" : "student"
@@ -82,8 +87,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (!user) return
 
     const fullResult: QuizResult = {
-      ...result,
-      userId: user.name,
+        ...result,
       userName: user.name,
     }
 
